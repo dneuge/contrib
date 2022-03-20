@@ -67,9 +67,23 @@ would exclude all containers with the word "runner" in the name.
 This section has been reverse-engineered from git logs. Prefix indicates if the changes
 were contributed to docker_ original script or podman_ fork.
 
+[podman_] Daniel Neugebauer <dneuge@energiequant.de>: fork to podman_, initial contribution of Podman library
 [docker_] Codimp <contact@lithio.fr>: original rewrite
 [docker_] Rowan Wookey <admin@rwky.net>: performance improvement
 [docker_] Olivier Mehani <shtrom@ssji.net>: Network support, ClientWrapper, general cleanup, multigraph
+
+=head1 LICENSE
+
+This plugin has been forked from docker/docker_ plugin on 20 March 2022. The original code did not
+specify any license and thus is believed to have been distributed under GPL2 as that is the default license
+stated in Munin contrib README.
+
+In order to interface with Podman/libpod without requiring additional external dependencies to be installed,
+some helper functions & classes had to be written. Those are distributed under the much more compatible MIT license
+(relevant code is surrounded by START..END marker comments below) although they have been incorporated to this
+presumably GPLv2-licensed file. This is in accordance to the MIT license which allows sublicensing. Any changes
+made to the MIT licensed parts should however be made unter MIT terms to allow those improvements to be reused
+in non-GPL code (not limited to Munin plugins) as well.
 
 =head1 MAGIC MARKERS
 
@@ -78,6 +92,262 @@ were contributed to docker_ original script or podman_ fork.
 
 =cut
 """
+
+### START OF MIT-LICENSED CODE
+## As access to Podman/libpod API and HTTP-over-Unix-sockets is of more general use and not restricted to
+## just munin-contrib plugins this section is to be seen as an independently written, yet incorporated
+## piece of code. It has not been split to a library (yet) to make it easier to distribute this plugin
+## without having to rely on externally installed dependencies.
+##
+## Inclusion of this section to GPLv2 licensed code shall not taint independent (re)use, distribution and
+## further development of this section's code under the terms of MIT license.
+##
+##
+## This section (until the END OF... marker comment) can be used freely according to the terms of
+## the MIT license: (the explanations provided up until here do *not* need to be reproduced on copies)
+##
+## Copyright 2022 Daniel Neugebauer
+##
+## Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+## associated documentation files (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+## and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+##
+## The above copyright notice and this permission notice shall be included in all copies or substantial
+## portions of the Software.
+##
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+## LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+## NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+## WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+##
+import json
+import os
+import pwd
+import re
+import socket
+import stat
+import time
+
+CLIENT_API_VERSION = b'v1.40'
+BUFFER_SIZE = 65536
+
+## ultra-basic "HTTP via UNIX socket" implementation for communication with libpod
+def connect_unix_socket(socket_path):
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect(socket_path)
+    return s
+
+def extract_http_header_fields(lines):
+    http_header_fields = {}
+    
+    # line-folding is not supported but is obsolete in RFC and should not be used by Podman API
+    for line in lines:
+        tmp = line.split(':', 1)
+        if len(tmp) < 2:
+            continue
+        http_header_fields[tmp[0].lower()] = tmp[1].strip()
+
+    return http_header_fields
+
+def get(s, endpoint, extra_headers=''):
+    url = b'/' + CLIENT_API_VERSION + b'/' + endpoint.encode('ASCII').lstrip(b'/')
+    http_request_header  = b'GET ' + url + b' HTTP/1.1\r\n'
+    http_request_header += b'Host: d\r\n'
+    http_request_header += b'Connection: keep-alive\r\n'
+    http_request_header += extra_headers.rstrip('\r\n').encode('ASCII') + b'\r\n'
+    http_request_header += b'\r\n'
+    s.sendall(http_request_header)
+
+    total_data = bytearray()
+    while True:
+        this_data = s.recv(BUFFER_SIZE)
+        if len(this_data) == 0:
+            raise RuntimeError('no data received')
+        
+        total_data += this_data
+        if total_data.find(b'\r\n') < 0:
+            continue
+        
+        http_sections = total_data.split(b'\r\n\r\n', maxsplit=1)
+        http_header = http_sections[0].decode('ASCII').split('\r\n')
+        http_body = http_sections[1] if len(http_sections) > 1 else None
+        
+        tmp = http_header[0].split(' ', maxsplit=2)
+        http_status = {
+            'protocol': tmp[0],
+            'code': int(tmp[1]) if len(tmp) > 1 else None,
+            'message': tmp[2] if len(tmp) > 2 else None
+        }
+        
+        http_header_fields = extract_http_header_fields(http_header[1:]) if len(http_header) > 1 else {}
+        
+        if http_body is None:
+            continue
+
+        if 'transfer-encoding' in http_header_fields and len(http_header_fields['transfer-encoding']) > 0:
+            if http_header_fields['transfer-encoding'] != 'chunked':
+                raise RuntimeError('Unsupported Transfer-Encoding: %s' % http_header_fields['transfer-encoding'])
+            
+            chunks = []
+            remainder = http_body
+            while len(remainder) > 0:
+                tmp = remainder.split(b'\r\n', maxsplit=1)
+                if len(tmp) < 2:
+                    break
+                
+                chunk_length = int(tmp[0].decode('ASCII'), 16)
+                
+                if len(tmp[1]) < chunk_length+2:
+                    break
+
+                chunk_data = tmp[1][:chunk_length]
+                remainder = tmp[1][chunk_length+2:]
+                
+                chunks.append((chunk_length, chunk_data))
+            
+            transfer_complete = len(chunks) > 0 and chunks[-1][0] == 0 and total_data.endswith(b'\r\n\r\n')
+            if transfer_complete:
+                trailing_headers = chunks[-1][1] + remainder
+                trailing_headers_fields = extract_http_header_fields(trailing_headers.decode('ASCII').split('\r\n'))
+                http_header_fields.update(trailing_headers_fields)
+                
+                payload = bytearray()
+                for chunk in chunks:
+                    if chunk[0] != 0:
+                        payload += chunk[1]
+
+                return (http_status, http_header_fields, payload)
+        elif 'content-length' in http_header_fields and len(http_header_fields['content-length']) > 0:
+            expected_length = int(http_header_fields['content-length'])
+            actual_length = len(http_body) if http_body is not None else -1
+            
+            if actual_length == expected_length:
+                return (http_status, http_header_fields, http_body)
+            elif actual_length > expected_length:
+                raise RuntimeError('Received %d bytes although %d were announced in Content-Length header' % (actual_length, expected_length))
+        else:
+            raise RuntimeError('HTTP without Content-Length header or chunked transfer cannot be received:\n%s' % total_data.decode('ASCII'))
+
+def get_json(s, endpoint):
+    status, header, body = get(s, endpoint, 'Accept: application/json')
+
+    if status['code'] != 200:
+        raise RuntimeError('unhandled status code %d' % status['code'])
+    
+    if 'content-type' in header and header['content-type'] != 'application/json':
+        raise RuntimeError('unhandled content-type %s' % header['content-type'])
+    
+    json_str = body.decode('utf-8')
+    return json.loads(json_str)
+
+## Podman/libpod API
+class ContainerStatistics:
+    def __init__(self, json, is_root):
+        self.retrieved_nanoseconds = json['SystemNano']
+        self.container_id = json['ContainerID']
+        self.runtime_totalized_cpu_nanoseconds = json['CPUNano']
+        self.memory_used = json['MemUsage']
+        self.num_processes = json['PIDs']
+        
+        # IO counters are only expected to provide data if podman runs under root user,
+        # otherwise counters will be stuck at 0. Just in case we get non-zero values
+        # we should use them nevertheless.
+        self.network_in = json['NetInput']
+        self.network_out = json['NetOutput']
+        self.network_stats = is_root or self.network_in != 0 or self.network_out != 0
+        
+        # a container without IO cannot exist, so in case we encounter 0 as root that
+        # statistic is simply unavailable and should be disabled for root user as well
+        self.block_in = json['BlockInput']
+        self.block_out = json['BlockOutput']
+        self.block_stats = self.block_in != 0 or self.block_out != 0
+    
+    def get_retrieved_nanoseconds(self):
+        return self.retrieved_nanoseconds
+    
+    def get_runtime_totalized_cpu_nanoseconds(self):
+        return self.runtime_totalized_cpu_nanoseconds
+    
+    def get_memory_used(self):
+        return self.memory_used
+    
+    def has_network_stats(self):
+        return self.network_stats
+    
+    def get_network_from_container(self):
+        return self.network_in if self.network_stats else None
+    
+    def get_network_to_container(self):
+        return self.network_out if self.network_stats else None
+    
+    def has_block_stats(self):
+        return self.block_stats
+    
+    def get_block_bytes_read(self):
+        return self.block_in if self.block_stats else None
+    
+    def get_block_bytes_written(self):
+        return self.block_out if self.block_stats else None
+
+    def get_num_processes(self):
+        return self.num_processes
+    
+class PodmanAPI:
+    def __init__(self, uid):
+        self.uid = uid
+        self.is_root = (uid == 0)
+        socket_path = '/run/podman/podman.sock' if self.is_root else '/run/user/%d/podman/podman.sock' % (uid)
+        self.socket = connect_unix_socket(socket_path)
+    
+    def __del__(self):
+        self.socket.close()
+    
+    def get_uid(self):
+        return self.uid
+    
+    def containers(self):
+        return get_json(self.socket, '/libpod/containers/json?all=true')
+    
+    def container(self, container_id):
+        return get_json(self.socket, '/libpod/containers/%s/json' % container_id)
+    
+    def images(self):
+        return get_json(self.socket, '/libpod/images/json?all=true')
+
+    def stats(self):
+        json = get_json(self.socket, '/libpod/containers/stats?stream=false')
+        return {c['ContainerID']: ContainerStatistics(c, self.is_root) for c in json['Stats']}
+
+def is_socket(path):
+    return stat.S_ISSOCK(os.stat(path).st_mode)
+
+re_only_numbers = re.compile('^\d+$')
+def find_accessible_podman_uids():
+    uids = set()
+    
+    root_socket_path = '/run/podman/podman.sock'
+    if is_socket(root_socket_path) and os.access(root_socket_path, os.R_OK | os.W_OK):
+        uids.add(0)
+
+    user_base_dir = '/run/user/'
+    with os.scandir(user_base_dir) as it:
+        for entry in it:
+            if not entry.is_dir() or re_only_numbers.match(entry.name) is None:
+                continue
+            
+            uid = int(entry.name)
+            
+            socket_path = '%s%d/podman/podman.sock' % (user_base_dir, uid)
+            if is_socket(socket_path) and os.access(socket_path, os.R_OK | os.W_OK):
+                uids.add(uid)
+            
+    return uids
+### END OF MIT-LICENSED CODE
+### All following code resumes the standard license under which this plugin is being distributed.
+
 
 import os
 import sys
