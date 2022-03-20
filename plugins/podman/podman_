@@ -2,7 +2,7 @@
 """
 =head1 NAME
 
-docker_ - Docker wildcard-plugin to monitor a L<Docker|https://www.docker.com> host.
+podman_ - Podman wildcard-plugin to monitor a L<Podman|https://podman.io> host.
 
 This wildcard plugin provides series C<containers>, C<images>, C<status>,
 C<volumes>, C<cpu>, C<memory> and C<network> as separate graphs. It also
@@ -11,23 +11,23 @@ supports a C<multi> suffix that provides all of those as a multigraph.
 =head1 INSTALLATION
 
 - Copy this plugin in your munin plugins directory
-- Install Python3 "docker" package
+- Install Python3
 
 =over 2
 
 If you want all the graphs as a multigraph, create a single multi symlink.
 
-    ln -s /usr/share/munin/plugins/docker_ /etc/munin/plugins/docker_multi
+    ln -s /usr/share/munin/plugins/podman_ /etc/munin/plugins/podman_multi
 
 Or choose a subset of those you want.
 
-    ln -s /usr/share/munin/plugins/docker_ /etc/munin/plugins/docker_containers
-    ln -s /usr/share/munin/plugins/docker_ /etc/munin/plugins/docker_cpu
-    ln -s /usr/share/munin/plugins/docker_ /etc/munin/plugins/docker_images
-    ln -s /usr/share/munin/plugins/docker_ /etc/munin/plugins/docker_memory
-    ln -s /usr/share/munin/plugins/docker_ /etc/munin/plugins/docker_network
-    ln -s /usr/share/munin/plugins/docker_ /etc/munin/plugins/docker_status
-    ln -s /usr/share/munin/plugins/docker_ /etc/munin/plugins/docker_volumes
+    ln -s /usr/share/munin/plugins/podman_ /etc/munin/plugins/podman_containers
+    ln -s /usr/share/munin/plugins/podman_ /etc/munin/plugins/podman_cpu
+    ln -s /usr/share/munin/plugins/podman_ /etc/munin/plugins/podman_images
+    ln -s /usr/share/munin/plugins/podman_ /etc/munin/plugins/podman_memory
+    ln -s /usr/share/munin/plugins/podman_ /etc/munin/plugins/podman_network
+    ln -s /usr/share/munin/plugins/podman_ /etc/munin/plugins/podman_status
+    ln -s /usr/share/munin/plugins/podman_ /etc/munin/plugins/podman_volumes
 
 =back
 
@@ -41,42 +41,35 @@ After the installation you need to restart your munin-node:
 
 =head1 CONFIGURATION
 
-This plugin need to run as root, you need to create a file named docker placed in the
-directory /etc/munin/plugin-conf.d/ with the following config (you can also use
-Docker environment variables here as described in
-https://docs.docker.com/compose/reference/envvars/):
+For this plugin to be able to access all podman instances it needs to be run as root.
+To do so you need to create a file named podman placed in the
+directory /etc/munin/plugin-conf.d/ with the following config:
 
 You can use the EXCLUDE_CONTAINER_NAME environment variable to specify a regular expression
-which if matched will exclude the matching containers from the memory and cpu graphs.
+which if matched will exclude the matching containers from the memory, cpu and network graphs.
 
 For example
 
  env.EXCLUDE_CONTAINER_NAME runner
 
-Would exclude all containers with the word "runner" in the name.
-
+would exclude all containers with the word "runner" in the name.
 
 =over 2
 
-    [docker_*]
-    group docker
-    env.DOCKER_HOST unix://run/docker.sock
+    [podman_*]
+    user root
     env.EXCLUDE_CONTAINER_NAME regexp
 
 =back
 
-You may need to pick a different group depending on the name schema of your
-distribution.  Or maybe use "user root", if nothing else works.
-
 =head1 AUTHORS
 
-This section has been reverse-engineered from git logs
+This section has been reverse-engineered from git logs. Prefix indicates if the changes
+were contributed to docker_ original script or podman_ fork.
 
-Codimp <contact@lithio.fr>: original rewrite
-
-Rowan Wookey <admin@rwky.net>: performance improvement
-
-Olivier Mehani <shtrom@ssji.net>: Network support, ClientWrapper, general cleanup, multigraph
+[docker_] Codimp <contact@lithio.fr>: original rewrite
+[docker_] Rowan Wookey <admin@rwky.net>: performance improvement
+[docker_] Olivier Mehani <shtrom@ssji.net>: Network support, ClientWrapper, general cleanup, multigraph
 
 =head1 MAGIC MARKERS
 
@@ -508,7 +501,7 @@ def main():
         mode = sys.argv[1]
     except IndexError:
         mode = ""
-    wildcard = sys.argv[0].split("docker_")[1].split("_")[0]
+    wildcard = sys.argv[0].split("podman_")[1].split("_")[0]
 
     try:
         import docker
@@ -540,7 +533,7 @@ def main():
         globals()[wildcard](client, mode)
     elif wildcard == 'multi':
         for s in series:
-            print(f'multigraph docker_{s}')
+            print(f'multigraph podman_{s}')
             # ditto
             globals()[s](client, mode)
     else:
