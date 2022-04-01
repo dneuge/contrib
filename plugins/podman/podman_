@@ -294,7 +294,35 @@ class ContainerStatistics:
 
     def get_num_processes(self):
         return self.num_processes
+
+re_iso_datetime = re.compile('^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6})\d*([+\-]\d{2}:\d{2})$')
+def parse_iso_datetime(s):
+    # datetime.fromisoformat does not tolerate higher precision than microseconds
+    m = re_iso_datetime.match(s)
+    if m is not None:
+        s = m.group(1) + m.group(2)
     
+    return datetime.fromisoformat(s)
+
+class Container:
+    def __init__(self, uid, json):
+        self.uid = uid
+        self.created = parse_iso_datetime(json['Created'])
+        self.name = json['Names'][0]
+        self.state = json['State']
+    
+    def get_uid(self):
+        return self.uid
+
+    def get_name(self):
+        return self.name
+    
+    def get_state(self):
+        return self.state
+    
+    def get_created(self):
+        return self.created
+
 class PodmanAPI:
     def __init__(self, uid):
         self.uid = uid
@@ -309,7 +337,7 @@ class PodmanAPI:
         return self.uid
     
     def containers(self):
-        return get_json(self.socket, '/libpod/containers/json?all=true')
+        return [Container(self.uid, container_json) for container_json in get_json(self.socket, '/libpod/containers/json?all=true')]
     
     def container(self, container_id):
         return get_json(self.socket, '/libpod/containers/%s/json' % container_id)
@@ -349,6 +377,7 @@ def find_accessible_podman_uids():
 ### All following code resumes the standard license under which this plugin is being distributed.
 
 
+from datetime import datetime
 import os
 import sys
 import re
@@ -367,9 +396,7 @@ def sorted_by_creation_date(func):
         return sorted(
             func(*args, **kwargs),
             key=(
-                lambda x: x.attrs['CreatedAt']
-                if 'CreatedAt' in x.attrs
-                else x.attrs['Created']
+                lambda x: x.get_created()
             )
         )
     return sorted_func
@@ -382,20 +409,24 @@ def clean_fieldname(text):
     else:
         return re.sub(r"(^[^A-Za-z_]|[^A-Za-z0-9_])", "_", text)
 
+def full_container_name(c):
+    # TODO: document changed format for exclude parameter
+    # TODO: add option to use username instead of uid
+    return '%d/%s' % (c.get_uid(), c.get_name())
 
 class ClientWrapper:
     """
-    A small wrapper for the docker client, to centralise some parsing logic,
+    A single-instance wrapper for multiple Podman sockets, to centralise some parsing logic,
     and support caching.
 
     In addition, when the exclude_re parameter is not None,
     any container which name is matched by the RE will not be excluded from reports.
     """
-    client = None
+    apis = None
     exclude = None
 
-    def __init__(self, client, exclude_re=None):
-        self.client = client
+    def __init__(self, apis, exclude_re=None):
+        self.apis = apis
         if exclude_re:
             self.exclude = re.compile(exclude_re)
 
@@ -406,10 +437,13 @@ class ClientWrapper:
     @cached_property
     @sorted_by_creation_date
     def all_containers(self):
-        return [
-            c for c in self.client.containers.list(all=True)
-            if (c.status == 'running') and (not self.exclude or not self.exclude.search(c.name))
-        ]
+        containers = []
+        for api in self.apis:
+            containers += [
+                c for c in api.containers()
+                if (c.get_state() == 'running') and (not self.exclude or not self.exclude.search(full_container_name(c)))
+            ]
+        return containers
 
     @cached_property
     @sorted_by_creation_date
@@ -774,10 +808,12 @@ def main():
     wildcard = sys.argv[0].split("podman_")[1].split("_")[0]
 
     try:
-        import docker
-        client = docker.from_env()
+        apis = [PodmanAPI(uid) for uid in find_accessible_podman_uids()]
+        
+        if len(apis) == 0:
+            raise RuntimeError('no accessible Podman sockets found')
+        
         if mode == "autoconf":
-            client.ping()
             print('yes')
             sys.exit(0)
     except Exception as e:
@@ -792,7 +828,7 @@ def main():
         print("multi")
         sys.exit(0)
 
-    client = ClientWrapper(client,
+    client = ClientWrapper(apis,
                            exclude_re=os.getenv('EXCLUDE_CONTAINER_NAME'))
 
     if wildcard in series:
