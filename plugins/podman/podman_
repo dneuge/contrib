@@ -540,7 +540,7 @@ def print_containers_status(client):
                 running.append(container)
         elif status == 'paused':
             paused.append(container)
-        elif status == 'created':
+        elif status in ['created', 'configured']:
             created.append(container)
         elif status == 'restarting':
             restarting.append(container)
@@ -875,3 +875,4 @@ if __name__ == '__main__':
     main()
 
 # FIXME: check if non-running containers need to be excluded from cpu, memory and network (originally solved by #1209)
+# TODO: check all possible container states (status)
