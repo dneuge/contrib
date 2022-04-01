@@ -307,18 +307,38 @@ def parse_iso_datetime(s):
 class Container:
     def __init__(self, uid, json):
         self.uid = uid
+        self.container_id = json['Id']
         self.created = parse_iso_datetime(json['Created'])
-        self.name = json['Names'][0]
-        self.state = json['State']
+        self.image = json['ImageName'] if 'ImageName' in json else json['Image']
+        self.name = json['Name'] if 'Name' in json else json['Names'][0]
+        
+        if isinstance(json['State'], str):
+            self.status = json['State']
+            self.health_status = None
+        else:
+            state = json['State']
+            self.status = state['Status']
+            self.health_status = state.get('Healthcheck', {}).get('Status', None)
+            if self.health_status == '':
+                self.health_status = None
+    
+    def get_id(self):
+        return self.container_id
     
     def get_uid(self):
         return self.uid
 
+    def get_image(self):
+        return self.image
+    
     def get_name(self):
         return self.name
     
-    def get_state(self):
-        return self.state
+    def get_status(self):
+        return self.status
+    
+    def get_health_status(self):
+        return self.health_status
     
     def get_created(self):
         return self.created
@@ -340,7 +360,7 @@ class PodmanAPI:
         return [Container(self.uid, container_json) for container_json in get_json(self.socket, '/libpod/containers/json?all=true')]
     
     def container(self, container_id):
-        return get_json(self.socket, '/libpod/containers/%s/json' % container_id)
+        return Container(self.uid, get_json(self.socket, '/libpod/containers/%s/json' % container_id))
     
     def images(self):
         return get_json(self.socket, '/libpod/images/json?all=true')
@@ -426,7 +446,7 @@ class ClientWrapper:
     exclude = None
 
     def __init__(self, apis, exclude_re=None):
-        self.apis = apis
+        self.apis = {api.get_uid(): api for api in apis}
         if exclude_re:
             self.exclude = re.compile(exclude_re)
 
@@ -438,12 +458,16 @@ class ClientWrapper:
     @sorted_by_creation_date
     def all_containers(self):
         containers = []
-        for api in self.apis:
+        for api in self.apis.values():
             containers += [
                 c for c in api.containers()
-                if (c.get_state() == 'running') and (not self.exclude or not self.exclude.search(full_container_name(c)))
+                if (c.get_status() == 'running') and (not self.exclude or not self.exclude.search(full_container_name(c)))
             ]
         return containers
+
+    def inspect_container(self, container):
+        api = self.apis[container.get_uid()]
+        return api.container(container.get_id())
 
     @cached_property
     @sorted_by_creation_date
@@ -485,7 +509,7 @@ class ClientWrapper:
 
 
 def container_summary(container, *args):
-    summary = container.name
+    summary = full_container_name(container)
     attributes = container_attributes(container, *args)
     if attributes:
         summary += f' ({attributes})'
@@ -493,8 +517,7 @@ def container_summary(container, *args):
 
 
 def container_attributes(container, *args):
-    attributes = container.image.tags
-    attributes.append(container.attrs['Created'])
+    attributes = [container.get_image(), container.get_created().isoformat()]
     return ', '.join(attributes + list(args))
 
 
@@ -508,23 +531,24 @@ def print_containers_status(client):
     exited = []
     dead = []
     for container in client.all_containers:
-        if container.status == 'running':
-            state = client.api.inspect_container(container.name)['State']
-            if state.get('Health', {}).get('Status') == 'unhealthy':
+        status = container.get_status()
+        if status == 'running':
+            health_status = client.inspect_container(container).get_health_status()
+            if health_status is not None and health_status != 'healthy':
                 unhealthy.append(container)
             else:
                 running.append(container)
-        elif container.status == 'paused':
+        elif status == 'paused':
             paused.append(container)
-        elif container.status == 'created':
+        elif status == 'created':
             created.append(container)
-        elif container.status == 'restarting':
+        elif status == 'restarting':
             restarting.append(container)
-        elif container.status == 'removing':
+        elif status == 'removing':
             removing.append(container)
-        elif container.status == 'exited':
+        elif status == 'exited':
             exited.append(container)
-        elif container.status == 'dead':
+        elif status == 'dead':
             dead.append(container)
     print('running.value', len(running))
     print('running.extinfo', ', '.join(container_summary(c) for c in running))
