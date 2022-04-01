@@ -461,7 +461,7 @@ class ClientWrapper:
         for api in self.apis.values():
             containers += [
                 c for c in api.containers()
-                if (c.get_status() == 'running') and (not self.exclude or not self.exclude.search(full_container_name(c)))
+                if not self.exclude or not self.exclude.search(full_container_name(c))
             ]
         return containers
 
@@ -873,3 +873,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# FIXME: check if non-running containers need to be excluded from cpu, memory and network (originally solved by #1209)
