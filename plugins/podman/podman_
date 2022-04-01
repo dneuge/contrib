@@ -799,7 +799,7 @@ def cpu(client, mode):
         print("graph_total Total CPU usage")
         for container in client.all_containers:
             fieldname = container_fieldname(container)
-            print("{}.label {}".format(fieldname, container.name))
+            print("{}.label {}".format(fieldname, full_container_name(container)))
             print("{}.draw AREASTACK".format(fieldname))
             print("{}.info {}".format(fieldname, container_attributes(container)))
     else:
@@ -816,12 +816,12 @@ def network(client, mode):
         print("graph_total Total network usage")
         for container in client.all_containers:
             fieldname = container_fieldname(container)
-            print("{}_down.label {}_received".format(fieldname, container.name))
+            print("{}_down.label {}_received".format(fieldname, full_container_name(container)))
             print("{}_down.type DERIVE".format(fieldname))
             print("{}_down.min 0".format(fieldname))
             print("{}_down.graph no".format(fieldname))
             print("{}_down.cdef {}_down,8,*".format(fieldname, fieldname))
-            print("{}_up.label {}".format(fieldname, container.name))
+            print("{}_up.label {}".format(fieldname, full_container_name(container)))
             print("{}_up.draw LINESTACK1".format(fieldname))
             print("{}_up.type DERIVE".format(fieldname))
             print("{}_up.min 0".format(fieldname))
@@ -842,7 +842,7 @@ def memory(client, mode):
         print("graph_total Total memory usage")
         for container in client.all_containers:
             fieldname = container_fieldname(container)
-            print("{}.label {}".format(fieldname, container.name))
+            print("{}.label {}".format(fieldname, full_container_name(container)))
             print("{}.draw AREASTACK".format(fieldname))
             print("{}.info {}".format(fieldname, container_attributes(container)))
     else:
@@ -914,7 +914,8 @@ if __name__ == '__main__':
 
 # FIXME: check if non-running containers need to be excluded from cpu, memory and network (originally solved by #1209)
 # TODO: check all possible container states (status)
-# TODO: add option to track stats by container name instead of ID (IDs reset on creation, names may be continued)
-# TODO: add option to change sorting to name (more persistent) instead of creation time
+# TODO: add option to use username instead of UIDs on labels
+# TODO: add option to display UIDs/usernames on labels only in case of name conflicts
+# TODO: add option to change sorting to UID and container name (more persistent) instead of creation time
 # TODO: add option to override cpustats file location
 # TODO: add option to create graphs for specific users (needs adaption of get_wildcard)
