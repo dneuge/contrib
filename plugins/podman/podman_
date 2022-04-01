@@ -573,6 +573,9 @@ def container_attributes(container, *args):
     return ', '.join(attributes + list(args))
 
 
+def container_fieldname(container):
+    return clean_fieldname('u%d_%s' % (container.get_uid(), container.get_name()))
+
 def print_containers_status(client):
     running = []
     unhealthy = []
@@ -647,9 +650,9 @@ def print_containers_cpu(client):
         system_delta = (float(stats["cpu_retrieved"]) - float(stats["precpu_retrieved"]))
         if system_delta > 0.0:
             cpu_percent = cpu_delta / system_delta * 100.0 * os.cpu_count()
-        clean_container_name = clean_fieldname(container.name)
-        print(clean_container_name + '.value', cpu_percent)
-        print(clean_container_name + '.extinfo', container_attributes(container))
+        fieldprefix = container_fieldname(container)
+        print(fieldprefix + '.value', cpu_percent)
+        print(fieldprefix + '.extinfo', container_attributes(container))
 
 
 def print_containers_memory(client):
@@ -660,9 +663,9 @@ def print_containers_memory(client):
         else:
             memory_usage = stats['memory_stats']['usage']
             extinfo = 'Total memory usage'
-        clean_container_name = clean_fieldname(container.name)
-        print(clean_container_name + '.value', memory_usage)
-        print(clean_container_name + '.extinfo', container_attributes(container, extinfo))
+        fieldprefix = container_fieldname(container)
+        print(fieldprefix + '.value', memory_usage)
+        print(fieldprefix + '.extinfo', container_attributes(container, extinfo))
 
 
 def print_containers_network(client):
@@ -673,10 +676,10 @@ def print_containers_network(client):
             for data in stats['networks'].values():
                 tx_bytes += data['tx_bytes']
                 rx_bytes += data['rx_bytes']
-        clean_container_name = clean_fieldname(container.name)
-        print(clean_container_name + '_up.value', tx_bytes)
-        print(clean_container_name + '_down.value', rx_bytes)
-        print(clean_container_name + '_up.extinfo', container_attributes(container))
+        fieldprefix = container_fieldname(container)
+        print(fieldprefix + '_up.value', tx_bytes)
+        print(fieldprefix + '_down.value', rx_bytes)
+        print(fieldprefix + '_up.extinfo', container_attributes(container))
 
 
 def volume_summary(volume):
@@ -795,7 +798,7 @@ def cpu(client, mode):
         print("graph_info This graph shows docker container CPU usage.")
         print("graph_total Total CPU usage")
         for container in client.all_containers:
-            fieldname = clean_fieldname(container.name)
+            fieldname = container_fieldname(container)
             print("{}.label {}".format(fieldname, container.name))
             print("{}.draw AREASTACK".format(fieldname))
             print("{}.info {}".format(fieldname, container_attributes(container)))
@@ -812,7 +815,7 @@ def network(client, mode):
         print("graph_info This graph shows docker container network usage.")
         print("graph_total Total network usage")
         for container in client.all_containers:
-            fieldname = clean_fieldname(container.name)
+            fieldname = container_fieldname(container)
             print("{}_down.label {}_received".format(fieldname, container.name))
             print("{}_down.type DERIVE".format(fieldname))
             print("{}_down.min 0".format(fieldname))
@@ -838,7 +841,7 @@ def memory(client, mode):
         print("graph_info This graph shows docker container memory usage.")
         print("graph_total Total memory usage")
         for container in client.all_containers:
-            fieldname = clean_fieldname(container.name)
+            fieldname = container_fieldname(container)
             print("{}.label {}".format(fieldname, container.name))
             print("{}.draw AREASTACK".format(fieldname))
             print("{}.info {}".format(fieldname, container_attributes(container)))
