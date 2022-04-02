@@ -819,8 +819,12 @@ def print_containers_network(client):
         print(fieldprefix + '_up.extinfo', container_attributes(container))
 
 
+def volume_full_id(volume):
+    return '%d/%s' % (volume.get_uid(), volume.get_name())
+
+
 def volume_summary(volume):
-    summary = volume.get_name()
+    summary = volume_full_id(volume)
     labels = volume.get_labels()
     if len(labels) > 0:
         summary += f" ({', '.join(sorted(labels))})"
