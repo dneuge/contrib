@@ -434,6 +434,25 @@ class Image:
     def get_tags(self):
         return self.tags.copy()
 
+class Volume:
+    def __init__(self, uid, json):
+        self.name = json['Name']
+        self.uid = uid
+        self.created = parse_iso_datetime(json['CreatedAt'])
+        self.labels = json['Labels']
+    
+    def get_name(self):
+        return self.name
+    
+    def get_uid(self):
+        return self.uid
+    
+    def get_created(self):
+        return self.created
+    
+    def get_labels(self):
+        return self.labels.copy()
+
 class PodmanAPI:
     def __init__(self, uid):
         self.uid = uid
@@ -470,6 +489,9 @@ class PodmanAPI:
     def stats(self):
         json = get_json(self.socket, '/libpod/containers/stats?stream=false')
         return {c['ContainerID']: ContainerStatistics(c, self.is_root) for c in json['Stats']}
+
+    def volumes(self):
+        return [Volume(self.uid, v) for v in get_json(self.socket, '/libpod/volumes/json')]
 
 def is_socket(path):
     return stat.S_ISSOCK(os.stat(path).st_mode)
@@ -667,7 +689,10 @@ class ClientWrapper:
     @cached_property
     @sorted_by_creation_date
     def volumes(self):
-        return self.client.volumes.list()
+        volumes = []
+        for api in self.apis.values():
+            volumes += api.volumes()
+        return volumes
 
 
 def container_summary(container, *args):
@@ -787,9 +812,10 @@ def print_containers_network(client):
 
 
 def volume_summary(volume):
-    summary = f"{volume.short_id}"
-    if volume.attrs['Labels']:
-        summary += f" ({', '.join(volume.attrs['Labels'])})"
+    summary = volume.get_name()
+    labels = volume.get_labels()
+    if len(labels) > 0:
+        summary += f" ({', '.join(sorted(labels))})"
     return summary
 
 
