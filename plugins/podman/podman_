@@ -175,6 +175,7 @@ in non-GPL code (not limited to Munin plugins) as well.
 ## WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 ## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ##
+from datetime import datetime, timezone
 import json
 import os
 import pwd
@@ -182,6 +183,7 @@ import re
 import socket
 import stat
 import time
+import urllib.parse
 
 CLIENT_API_VERSION = b'v1.40'
 BUFFER_SIZE = 65536
@@ -405,6 +407,33 @@ class Container:
     def get_created(self):
         return self.created
 
+class Image:
+    def __init__(self, json):
+        self.image_id = json['Id']
+        self.created = datetime.fromtimestamp(json['Created'], tz=timezone.utc)
+        self.digest = tuple(json['Digest'].split(':'))
+        self.names = set(json['Names'])
+        self.size = json['Size']
+        self.tags = set(json['RepoTags'])
+    
+    def get_id(self):
+        return self.image_id
+    
+    def get_created(self):
+        return self.created
+    
+    def get_digest(self):
+        return self.digest
+    
+    def get_names(self):
+        return self.names.copy()
+    
+    def get_size(self):
+        return self.size
+    
+    def get_tags(self):
+        return self.tags.copy()
+
 class PodmanAPI:
     def __init__(self, uid):
         self.uid = uid
@@ -424,8 +453,19 @@ class PodmanAPI:
     def container(self, container_id):
         return Container(self.uid, get_json(self.socket, '/libpod/containers/%s/json' % container_id))
     
-    def images(self):
-        return get_json(self.socket, '/libpod/images/json?all=true')
+    def images(self, all=True, filter_dangling=None):
+        params = {}
+        if all:
+            params['all'] = 'true'
+        
+        filters = {}
+        if filter_dangling:
+            # this looks weird but API actually performs some duplicate unpacking with an intermediate map and everything else gives a 500 error
+            filters['dangling'] = {'true': True}
+        if len(filters) > 0:
+            params['filters'] = json.dumps(filters)
+
+        return {i['Id']: Image(i) for i in get_json(self.socket, '/libpod/images/json?'+urllib.parse.urlencode(params, quote_via=urllib.parse.quote))}
 
     def stats(self):
         json = get_json(self.socket, '/libpod/containers/stats?stream=false')
@@ -536,15 +576,13 @@ class ClientWrapper:
     @cached_property
     @sorted_by_creation_date
     def intermediate_images(self):
-        return list(
-            set(self.all_images)
+        wanted_ids = {i.get_id() for i in self.all_images}.difference(
+            {i.get_id() for i in self.images}
             .difference(
-                set(self.images)
-                .difference(
-                    set(self.dangling_images)
-                )
+                {i.get_id() for i in self.dangling_images}
             )
         )
+        return [image for image in self.all_images if image.get_id() in wanted_ids]
 
     def load_cpu_stats(self):
         stats = {}
@@ -603,22 +641,28 @@ class ClientWrapper:
     @cached_property
     @sorted_by_creation_date
     def all_images(self):
-        return self.client.images.list(all=True)
+        images = {}
+        for api in self.apis.values():
+            images.update(api.images())
+        return list(images.values())
 
     @cached_property
     @sorted_by_creation_date
     def images(self):
-        images = self.client.images.list()
-        return list(
-            set(images)
-            .difference(
-                set(self.dangling_images))
-        )
+        images = {}
+        for api in self.apis.values():
+            images.update(api.images(all=False))
+        
+        wanted_ids = {i.get_id() for i in images.values()}.difference({i.get_id() for i in self.dangling_images})
+        return [image for image in images.values() if image.get_id() in wanted_ids]
 
     @cached_property
     @sorted_by_creation_date
     def dangling_images(self):
-        return self.client.images.list(filters={'dangling': True})
+        images = {}
+        for api in self.apis.values():
+            images.update(api.images(all=False, filter_dangling=True))
+        return list(images.values())
 
     @cached_property
     @sorted_by_creation_date
@@ -689,11 +733,15 @@ def print_containers_status(client):
     print('dead.extinfo', ', '.join(container_summary(c) for c in dead))
 
 
+def short_digest(image):
+    return '%s:%.10s' % image.get_digest()
+
+
 def image_summary(image):
-    attributes = image.tags
-    attributes.append(image.attrs['Created'])
-    attributes.append(f"{round(image.attrs['Size']/1024**2, 2)} MiB")
-    return f"{image.short_id} ({', '.join(attributes)})"
+    attributes = list(sorted(image.get_tags().union(image.get_names())))
+    attributes.append(image.get_created().isoformat())
+    attributes.append(f"{round(image.get_size()/1024**2, 2)} MiB")
+    return f"{short_digest(image)} ({', '.join(attributes)})"
 
 
 def print_images_count(client):
@@ -970,6 +1018,7 @@ if __name__ == '__main__':
 
 # FIXME: check if non-running containers need to be excluded from cpu, memory and network (originally solved by #1209)
 # TODO: check all possible container states (status)
+# TODO: test if "intermediate" and "dangling" images are shown correctly (first figure out how to produce them, I never had any according to docker_)
 # TODO: add option to use username instead of UIDs on labels
 # TODO: add option to display UIDs/usernames on labels only in case of name conflicts
 # TODO: add option to change sorting to UID and container name (more persistent) instead of creation time
