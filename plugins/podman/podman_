@@ -233,14 +233,24 @@ def get(s, endpoint, extra_headers=''):
 
 def get_json(s, endpoint):
     status, header, body = get(s, endpoint, 'Accept: application/json')
+    charset = 'utf-8'
 
     if status['code'] != 200:
         raise RuntimeError('unhandled status code %d' % status['code'])
     
-    if 'content-type' in header and header['content-type'] != 'application/json':
-        raise RuntimeError('unhandled content-type %s' % header['content-type'])
+    if 'content-type' in header:
+        # podman sometimes indicates plaintext although responding with JSON content
+        parts = [part.strip() for part in header['content-type'].split(';')]
+        if parts[0] not in ['application/json', 'text/plain']:
+            raise RuntimeError('unhandled content-type %s' % header['content-type'])
+        
+        if len(parts) > 1:
+            for part in parts[1:]:
+                tmp = part.split('=')
+                if tmp[0].strip().lower() == 'charset':
+                    charset = tmp[1].strip().lower()
     
-    json_str = body.decode('utf-8')
+    json_str = body.decode(charset)
     return json.loads(json_str)
 
 ## Podman/libpod API
