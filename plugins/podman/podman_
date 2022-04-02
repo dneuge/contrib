@@ -408,8 +408,9 @@ class Container:
         return self.created
 
 class Image:
-    def __init__(self, json):
+    def __init__(self, uid, json):
         self.image_id = json['Id']
+        self.uid = uid
         self.created = datetime.fromtimestamp(json['Created'], tz=timezone.utc)
         self.digest = tuple(json['Digest'].split(':'))
         self.names = set(json['Names'])
@@ -418,6 +419,9 @@ class Image:
     
     def get_id(self):
         return self.image_id
+    
+    def get_uid(self):
+        return self.uid
     
     def get_created(self):
         return self.created
@@ -484,7 +488,7 @@ class PodmanAPI:
         if len(filters) > 0:
             params['filters'] = json.dumps(filters)
 
-        return {i['Id']: Image(i) for i in get_json(self.socket, '/libpod/images/json?'+urllib.parse.urlencode(params, quote_via=urllib.parse.quote))}
+        return [Image(self.uid, i) for i in get_json(self.socket, '/libpod/images/json?'+urllib.parse.urlencode(params, quote_via=urllib.parse.quote))]
 
     def stats(self):
         json = get_json(self.socket, '/libpod/containers/stats?stream=false')
@@ -598,13 +602,13 @@ class ClientWrapper:
     @cached_property
     @sorted_by_creation_date
     def intermediate_images(self):
-        wanted_ids = {i.get_id() for i in self.all_images}.difference(
-            {i.get_id() for i in self.images}
+        wanted_ids = {(i.get_uid(), i.get_id()) for i in self.all_images}.difference(
+            {(i.get_uid(), i.get_id()) for i in self.images}
             .difference(
-                {i.get_id() for i in self.dangling_images}
+                {(i.get_uid(), i.get_id()) for i in self.dangling_images}
             )
         )
-        return [image for image in self.all_images if image.get_id() in wanted_ids]
+        return [image for image in self.all_images if (image.get_uid(), image.get_id()) in wanted_ids]
 
     def load_cpu_stats(self):
         stats = {}
@@ -663,28 +667,28 @@ class ClientWrapper:
     @cached_property
     @sorted_by_creation_date
     def all_images(self):
-        images = {}
+        images = []
         for api in self.apis.values():
-            images.update(api.images())
-        return list(images.values())
+            images += api.images()
+        return images
 
     @cached_property
     @sorted_by_creation_date
     def images(self):
-        images = {}
+        images = []
         for api in self.apis.values():
-            images.update(api.images(all=False))
+            images += api.images(all=False)
         
-        wanted_ids = {i.get_id() for i in images.values()}.difference({i.get_id() for i in self.dangling_images})
-        return [image for image in images.values() if image.get_id() in wanted_ids]
+        wanted_ids = {(i.get_uid(), i.get_id()) for i in images}.difference({(i.get_uid(), i.get_id()) for i in self.dangling_images})
+        return [image for image in images if (image.get_uid(), image.get_id()) in wanted_ids]
 
     @cached_property
     @sorted_by_creation_date
     def dangling_images(self):
-        images = {}
+        images = []
         for api in self.apis.values():
-            images.update(api.images(all=False, filter_dangling=True))
-        return list(images.values())
+            images += api.images(all=False, filter_dangling=True)
+        return images
 
     @cached_property
     @sorted_by_creation_date
@@ -762,11 +766,15 @@ def short_digest(image):
     return '%s:%.10s' % image.get_digest()
 
 
+def image_full_id(image):
+    return '%d/%s' % (image.get_uid(), short_digest(image))
+
+
 def image_summary(image):
     attributes = list(sorted(image.get_tags().union(image.get_names())))
     attributes.append(image.get_created().isoformat())
     attributes.append(f"{round(image.get_size()/1024**2, 2)} MiB")
-    return f"{short_digest(image)} ({', '.join(attributes)})"
+    return f"{image_full_id(image)} ({', '.join(attributes)})"
 
 
 def print_images_count(client):
