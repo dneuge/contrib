@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+=encoding utf8
+
 =head1 NAME
 
 podman_ - Podman wildcard-plugin to monitor a L<Podman|https://podman.io> host.
@@ -10,8 +12,9 @@ supports a C<multi> suffix that provides all of those as a multigraph.
 
 =head1 INSTALLATION
 
-- Copy this plugin in your munin plugins directory
-- Install Python3
+  - Copy this plugin in your munin plugins directory
+  - Install Python3 
+  - Check your systemd munin-node unit file (see dedicated section below) 
 
 =over 2
 
@@ -62,15 +65,64 @@ would exclude all containers with the word "runner" in the name.
 
 =back
 
+=head1 SYSTEMD TROUBLESHOOTING AND KNOWN ISSUES
+
+=head2 Podman users need to have an API socket
+
+Podman uses systemd extensively and spawns sockets dynamically for the duration of a user login (aka "serverless").
+As a result, no information will be available about Podman namespaces for users who are neither logged in nor have
+any containers running at the time of Munin data collection.
+
+=head2 Sandbox prevents API socket access/discovery
+
+The default munin-node unit file of your Linux distribution may have been configured to sandbox C</run>
+using C<ProtectHome> or similar options. Thus, even if a Podman socket exists, the monitoring plugin may not be
+able to access it.
+
+C<ProtectHome=true> hides sockets of users other than the one used to run C<munin-node> in systemd. Running plugins
+as specific users (including C<root>) in Munin plugin configurations does not help in that case, you also have to
+edit the systemd unit file to open up the sandbox (even C<root> is not allowed to see other users' C</run> directories).
+
+To do so, run C<systemctl edit munin-node.service> (or however your unit file is called) and add override options
+to the C<Service> section; either:
+
+=over 2
+
+1. Disable home protection completely - but be aware of the consequences before doing so.
+
+   [Service]
+   ProtectHome=false
+
+2. If you know all users you want to monitor containers for and the sockets are always available you could list
+   them manually in your unit file. However, this will probably fail munin-node startup if the paths to be bound
+   do not exist and you may need to add further service dependencies. This may break your whole Munin monitoring
+   if just one of the required Podman sockets is unavailable and thus may not be preferable. At best this should
+   only be done when monitoring always-logged-in system users, not regular users as they are not logged in at
+   system startup and/or will eventually log out again.
+
+   [Service]
+   ProtectHome=tmpfs
+   BindPaths=/run/user/1000/podman/ /run/user/1001/podman/
+
+=back
+
+Remember to reload unit files and restart the service after you made any changes, then check if retrieval works
+as expected:
+
+  systemctl daemon-reload
+  systemctl restart munin-node
+  systemctl status munin-node
+  # ... also monitor munin log and graph output
+
 =head1 AUTHORS
 
 This section has been reverse-engineered from git logs. Prefix indicates if the changes
 were contributed to docker_ original script or podman_ fork.
 
-[podman_] Daniel Neugebauer <dneuge@energiequant.de>: fork to podman_, initial contribution of Podman library
-[docker_] Codimp <contact@lithio.fr>: original rewrite
-[docker_] Rowan Wookey <admin@rwky.net>: performance improvement
-[docker_] Olivier Mehani <shtrom@ssji.net>: Network support, ClientWrapper, general cleanup, multigraph
+  [podman_] Daniel Neugebauer <dneuge@energiequant.de>: fork to podman_, initial contribution of Podman library
+  [docker_] Codimp <contact@lithio.fr>: original rewrite
+  [docker_] Rowan Wookey <admin@rwky.net>: performance improvement
+  [docker_] Olivier Mehani <shtrom@ssji.net>: Network support, ClientWrapper, general cleanup, multigraph
 
 =head1 LICENSE
 
