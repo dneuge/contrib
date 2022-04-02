@@ -747,55 +747,55 @@ def volume_summary(volume):
 
 def status(client, mode):
     if mode == "config":
-        print("graph_title Docker status")
+        print("graph_title Podman status")
         print("graph_vlabel containers")
         print("graph_category virtualization")
         print("graph_total All containers")
         print("running.label RUNNING")
         print("running.draw AREASTACK")
         print("running.info Running containers can be manipulated with "
-              "`docker container [attach|kill|logs|pause|restart|stop] <NAME>` or "
-              "commands run in them with `docker container exec "
+              "`podman container [attach|kill|logs|pause|restart|stop] <NAME>` or "
+              "commands run in them with `podman container exec "
               "[--detach|--interactive,--privileged,--tty] <NAME> <COMMAND>`"
               )
         print("unhealthy.label UNHEALTHY")
         print("unhealthy.draw AREASTACK")
         print("unhealthy.warning 1")
         print("unhealthy.info Unhealthy containers can be restarted with "
-              "`docker container restart <NAME>`")
+              "`podman container restart <NAME>`")
         print("paused.label PAUSED")
         print("paused.draw AREASTACK")
         print("paused.info Paused containers can be resumed with "
-              "`docker container unpause <NAME>`")
+              "`podman container unpause <NAME>`")
         print("created.label CREATED")
         print("created.draw AREASTACK")
         print("created.info New containers can be created with "
-              "`docker container create --name <NAME> <IMAGE_ID >` or "
-              "`docker container run --name <NAME> <IMAGE_ID> <COMMAND>`")
+              "`podman container create --name <NAME> <IMAGE_ID >` or "
+              "`podman container run --name <NAME> <IMAGE_ID> <COMMAND>`")
         print("restarting.label RESTARTING")
         print("restarting.draw AREASTACK")
         print("restarting.info Containers can be restarted with "
-              "`docker container restart <NAME>`")
+              "`podman container restart <NAME>`")
         print("removing.label REMOVING")
         print("removing.draw AREASTACK")
         print("removing.info Containers can be removed with "
-              "`docker container rm <NAME>`")
+              "`podman container rm <NAME>`")
         print("exited.label EXITED")
         print("exited.draw AREASTACK")
         print("exited.info Exited containers can be started with "
-              "`docker container start [--attach] <NAME>`")
+              "`podman container start [--attach] <NAME>`")
         print("dead.label DEAD")
         print("dead.draw AREASTACK")
         print("dead.warning 1")
         print("dead.info Dead containers can be started with "
-              "`docker container start <NAME>`")
+              "`podman container start <NAME>`")
     else:
         print_containers_status(client)
 
 
 def containers(client, mode):
     if mode == "config":
-        print("graph_title Docker containers")
+        print("graph_title Podman containers")
         print("graph_vlabel containers")
         print("graph_category virtualization")
         print("containers_quantity.label Containers")
@@ -805,24 +805,24 @@ def containers(client, mode):
 
 def images(client, mode):
     if mode == "config":
-        print("graph_title Docker images")
+        print("graph_title Podman images")
         print("graph_vlabel images")
         print("graph_category virtualization")
         print("graph_total All images")
         print("intermediate_quantity.label Intermediate images")
         print("intermediate_quantity.draw AREASTACK")
         print("intermediate_quantity.info All unused images can be deleted with "
-              "`docker image prune --all`")
+              "`podman image prune --all`")
         print("images_quantity.label Images")
         print("images_quantity.draw AREASTACK")
         print("images_quantity.info Images can be used in containers with "
-              "`docker container create --name <NAME> <IMAGE_ID >` or "
-              "`docker container run --name <NAME> <IMAGE_ID> <COMMAND>`")
+              "`podman container create --name <NAME> <IMAGE_ID >` or "
+              "`podman container run --name <NAME> <IMAGE_ID> <COMMAND>`")
         print("dangling_quantity.label Dangling images")
         print("dangling_quantity.draw AREASTACK")
         print("dangling_quantity.info Dangling images can be deleted with "
-              "`docker image prune`"
-              "or tagged with `docker image tag <IMAGE_ID> <NAME>`")
+              "`podman image prune`"
+              "or tagged with `podman image tag <IMAGE_ID> <NAME>`")
         print("dangling_quantity.warning 10")
     else:
         print_images_count(client)
@@ -830,13 +830,13 @@ def images(client, mode):
 
 def volumes(client, mode):
     if mode == "config":
-        print("graph_title Docker volumes")
+        print("graph_title Podman volumes")
         print("graph_vlabel volumes")
         print("graph_category virtualization")
         print("volumes_quantity.label Volumes")
         print("volumes_quantity.draw AREASTACK")
         print("volumes_quantity.info Unused volumes can be deleted with "
-              "`docker volume prune`")
+              "`podman volume prune`")
     else:
         print('volumes_quantity.value', len(client.volumes))
         print('volumes_quantity.extinfo', ', '.join(volume_summary(v) for v in client.volumes))
@@ -845,13 +845,13 @@ def volumes(client, mode):
 def cpu(client, mode):
     if mode == "config":
         graphlimit = str(os.cpu_count() * 100)
-        print("graph_title Docker containers CPU usage")
+        print("graph_title Podman containers CPU usage")
         print("graph_args --base 1000 -r --lower-limit 0 --upper-limit " + graphlimit)
         print("graph_scale no")
         print("graph_period second")
         print("graph_vlabel CPU usage (%)")
         print("graph_category virtualization")
-        print("graph_info This graph shows docker container CPU usage.")
+        print("graph_info This graph shows podman container CPU usage.")
         print("graph_total Total CPU usage")
         for container in client.all_containers:
             fieldname = container_fieldname(container)
@@ -864,11 +864,11 @@ def cpu(client, mode):
 
 def network(client, mode):
     if mode == "config":
-        print("graph_title Docker containers network usage")
+        print("graph_title Podman containers network usage")
         print("graph_args --base 1024 -l 0")
         print("graph_vlabel bits in (-) / out (+) per ${graph_period}")
         print("graph_category virtualization")
-        print("graph_info This graph shows docker container network usage.")
+        print("graph_info This graph shows podman container network usage.")
         print("graph_total Total network usage")
         for container in client.all_containers:
             fieldname = container_fieldname(container)
@@ -890,11 +890,11 @@ def network(client, mode):
 
 def memory(client, mode):
     if mode == "config":
-        print("graph_title Docker containers memory usage")
+        print("graph_title Podman containers memory usage")
         print("graph_args --base 1024 -l 0")
         print("graph_vlabel Bytes")
         print("graph_category virtualization")
-        print("graph_info This graph shows docker container memory usage.")
+        print("graph_info This graph shows podman container memory usage.")
         print("graph_total Total memory usage")
         for container in client.all_containers:
             fieldname = container_fieldname(container)
