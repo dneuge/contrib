@@ -45,8 +45,25 @@ After the installation you need to restart your munin-node:
 =head1 CONFIGURATION
 
 For this plugin to be able to access all podman instances it needs to be run as root.
-To do so you need to create a file named podman placed in the
-directory /etc/munin/plugin-conf.d/ with the following config:
+To do so you need to add a section for podman to your munin plugin configuration, generally
+split into separate files located at C</etc/munin/plugin-conf.d/>.
+
+Example:
+
+=over 2
+
+    [podman_*]
+    user root
+    env.containers_graph_limit0 true
+    env.images_graph_limit0 true
+    env.status_graph_limit0 true
+    env.volumes_graph_limit0 true
+
+=back
+
+=over 2
+
+=item env.EXCLUDE_CONTAINER_NAME
 
 You can use the EXCLUDE_CONTAINER_NAME environment variable to specify a regular expression
 which if matched will exclude the matching containers from the memory, cpu and network graphs.
@@ -57,13 +74,14 @@ For example
 
 would exclude all containers with the word "runner" in the name.
 
-=over 2
+=item env.MODE_graph_limit0
 
-    [podman_*]
-    user root
-    env.EXCLUDE_CONTAINER_NAME regexp
+Restricts the graph C<MODE> to always render with a lower boundary of zero if set to any value other than C<false>.
+
+C<MODE> can be C<containers>, C<images>, C<status> or C<volumes>. By default, these graphs will not be limited.
 
 =back
+
 
 =head1 SYSTEMD TROUBLESHOOTING AND KNOWN ISSUES
 
@@ -834,6 +852,8 @@ def volume_summary(volume):
 def status(client, mode):
     if mode == "config":
         print("graph_title Podman status")
+        if os.getenv('status_graph_limit0', 'false') != 'false':
+            print("graph_args --lower-limit 0")
         print("graph_vlabel containers")
         print("graph_category virtualization")
         print("graph_total All containers")
@@ -882,6 +902,8 @@ def status(client, mode):
 def containers(client, mode):
     if mode == "config":
         print("graph_title Podman containers")
+        if os.getenv('containers_graph_limit0', 'false') != 'false':
+            print("graph_args --lower-limit 0")
         print("graph_vlabel containers")
         print("graph_category virtualization")
         print("containers_quantity.label Containers")
@@ -892,6 +914,8 @@ def containers(client, mode):
 def images(client, mode):
     if mode == "config":
         print("graph_title Podman images")
+        if os.getenv('images_graph_limit0', 'false') != 'false':
+            print("graph_args --lower-limit 0")
         print("graph_vlabel images")
         print("graph_category virtualization")
         print("graph_total All images")
@@ -917,6 +941,8 @@ def images(client, mode):
 def volumes(client, mode):
     if mode == "config":
         print("graph_title Podman volumes")
+        if os.getenv('volumes_graph_limit0', 'false') != 'false':
+            print("graph_args --lower-limit 0")
         print("graph_vlabel volumes")
         print("graph_category virtualization")
         print("volumes_quantity.label Volumes")
