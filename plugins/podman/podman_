@@ -621,7 +621,7 @@ class ClientWrapper:
         return stats
     
     def save_cpu_stats(self, cpu_stats):
-        with os.fdopen(os.open(self.cpu_persistence_path, os.O_WRONLY | os.O_CREAT, 0o600), 'w') as fh:
+        with os.fdopen(os.open(self.cpu_persistence_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as fh:
             json.dump(cpu_stats, fh)
 
     @cached_property
