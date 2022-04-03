@@ -944,6 +944,7 @@ def cpu(client, mode):
             print("{}.label {}".format(fieldname, full_container_name(container)))
             print("{}.draw AREASTACK".format(fieldname))
             print("{}.info {}".format(fieldname, container_attributes(container)))
+            print("{}.min 0".format(fieldname))
     else:
         print_containers_cpu(client)
 
