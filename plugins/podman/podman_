@@ -80,6 +80,15 @@ Restricts the graph C<MODE> to always render with a lower boundary of zero if se
 
 C<MODE> can be C<containers>, C<images>, C<status> or C<volumes>. By default, these graphs will not be limited.
 
+=item env.MODE_graph_stackmode
+
+Can be set to C<line> or C<area> to change how the graph C<MODE> renders stacked values.
+
+C<MODE> can be C<cpu>, C<images>, C<memory>, C<network>, C<status> or C<volumes>. By default, all C<MODE>s will render
+C<area> stacks except C<network> which uses C<line> stacks.
+
+What you select is mainly up to your personal taste: C<area> tends to be more visible but C<line> may be easier to read.
+
 =back
 
 
@@ -857,41 +866,44 @@ def status(client, mode):
         print("graph_vlabel containers")
         print("graph_category virtualization")
         print("graph_total All containers")
+        
+        stackmode = 'AREASTACK' if os.getenv('status_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        
         print("running.label RUNNING")
-        print("running.draw AREASTACK")
+        print("running.draw {}".format(stackmode))
         print("running.info Running containers can be manipulated with "
               "`podman container [attach|kill|logs|pause|restart|stop] <NAME>` or "
               "commands run in them with `podman container exec "
               "[--detach|--interactive,--privileged,--tty] <NAME> <COMMAND>`"
               )
         print("unhealthy.label UNHEALTHY")
-        print("unhealthy.draw AREASTACK")
+        print("unhealthy.draw {}".format(stackmode))
         print("unhealthy.warning 1")
         print("unhealthy.info Unhealthy containers can be restarted with "
               "`podman container restart <NAME>`")
         print("paused.label PAUSED")
-        print("paused.draw AREASTACK")
+        print("paused.draw {}".format(stackmode))
         print("paused.info Paused containers can be resumed with "
               "`podman container unpause <NAME>`")
         print("created.label CREATED")
-        print("created.draw AREASTACK")
+        print("created.draw {}".format(stackmode))
         print("created.info New containers can be created with "
               "`podman container create --name <NAME> <IMAGE_ID >` or "
               "`podman container run --name <NAME> <IMAGE_ID> <COMMAND>`")
         print("restarting.label RESTARTING")
-        print("restarting.draw AREASTACK")
+        print("restarting.draw {}".format(stackmode))
         print("restarting.info Containers can be restarted with "
               "`podman container restart <NAME>`")
         print("removing.label REMOVING")
-        print("removing.draw AREASTACK")
+        print("removing.draw {}".format(stackmode))
         print("removing.info Containers can be removed with "
               "`podman container rm <NAME>`")
         print("exited.label EXITED")
-        print("exited.draw AREASTACK")
+        print("exited.draw {}".format(stackmode))
         print("exited.info Exited containers can be started with "
               "`podman container start [--attach] <NAME>`")
         print("dead.label DEAD")
-        print("dead.draw AREASTACK")
+        print("dead.draw {}".format(stackmode))
         print("dead.warning 1")
         print("dead.info Dead containers can be started with "
               "`podman container start <NAME>`")
@@ -919,17 +931,20 @@ def images(client, mode):
         print("graph_vlabel images")
         print("graph_category virtualization")
         print("graph_total All images")
+        
+        stackmode = 'AREASTACK' if os.getenv('volumes_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        
         print("intermediate_quantity.label Intermediate images")
-        print("intermediate_quantity.draw AREASTACK")
+        print("intermediate_quantity.draw {}".format(stackmode))
         print("intermediate_quantity.info All unused images can be deleted with "
               "`podman image prune --all`")
         print("images_quantity.label Images")
-        print("images_quantity.draw AREASTACK")
+        print("images_quantity.draw {}".format(stackmode))
         print("images_quantity.info Images can be used in containers with "
               "`podman container create --name <NAME> <IMAGE_ID >` or "
               "`podman container run --name <NAME> <IMAGE_ID> <COMMAND>`")
         print("dangling_quantity.label Dangling images")
-        print("dangling_quantity.draw AREASTACK")
+        print("dangling_quantity.draw {}".format(stackmode))
         print("dangling_quantity.info Dangling images can be deleted with "
               "`podman image prune`"
               "or tagged with `podman image tag <IMAGE_ID> <NAME>`")
@@ -945,8 +960,11 @@ def volumes(client, mode):
             print("graph_args --lower-limit 0")
         print("graph_vlabel volumes")
         print("graph_category virtualization")
+        
+        stackmode = 'AREASTACK' if os.getenv('volumes_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        
         print("volumes_quantity.label Volumes")
-        print("volumes_quantity.draw AREASTACK")
+        print("volumes_quantity.draw {}".format(stackmode))
         print("volumes_quantity.info Unused volumes can be deleted with "
               "`podman volume prune`")
     else:
@@ -965,10 +983,13 @@ def cpu(client, mode):
         print("graph_category virtualization")
         print("graph_info This graph shows podman container CPU usage.")
         print("graph_total Total CPU usage")
+        
+        stackmode = 'AREASTACK' if os.getenv('cpu_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        
         for container in client.all_containers:
             fieldname = container_fieldname(container)
             print("{}.label {}".format(fieldname, full_container_name(container)))
-            print("{}.draw AREASTACK".format(fieldname))
+            print("{}.draw {}".format(fieldname, stackmode))
             print("{}.info {}".format(fieldname, container_attributes(container)))
             print("{}.min 0".format(fieldname))
     else:
@@ -983,6 +1004,9 @@ def network(client, mode):
         print("graph_category virtualization")
         print("graph_info This graph shows podman container network usage.")
         print("graph_total Total network usage")
+        
+        stackmode = 'AREASTACK' if os.getenv('network_graph_stackmode', 'line') == 'area' else 'LINESTACK1'
+        
         for container in client.all_containers:
             fieldname = container_fieldname(container)
             print("{}_down.label {}_received".format(fieldname, full_container_name(container)))
@@ -991,7 +1015,7 @@ def network(client, mode):
             print("{}_down.graph no".format(fieldname))
             print("{}_down.cdef {}_down,8,*".format(fieldname, fieldname))
             print("{}_up.label {}".format(fieldname, full_container_name(container)))
-            print("{}_up.draw LINESTACK1".format(fieldname))
+            print("{}_up.draw {}".format(fieldname, stackmode))
             print("{}_up.type DERIVE".format(fieldname))
             print("{}_up.min 0".format(fieldname))
             print("{}_up.negative {}_down".format(fieldname, fieldname))
@@ -1009,10 +1033,13 @@ def memory(client, mode):
         print("graph_category virtualization")
         print("graph_info This graph shows podman container memory usage.")
         print("graph_total Total memory usage")
+        
+        stackmode = 'AREASTACK' if os.getenv('status_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        
         for container in client.all_containers:
             fieldname = container_fieldname(container)
             print("{}.label {}".format(fieldname, full_container_name(container)))
-            print("{}.draw AREASTACK".format(fieldname))
+            print("{}.draw {}".format(fieldname, stackmode))
             print("{}.info {}".format(fieldname, container_attributes(container)))
     else:
         print_containers_memory(client)
