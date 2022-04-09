@@ -823,7 +823,7 @@ def print_containers_cpu(client):
         cpu_delta = (float(stats["cpu_total_usage"]) - float(stats["precpu_total_usage"]))
         system_delta = (float(stats["cpu_retrieved"]) - float(stats["precpu_retrieved"]))
         if system_delta > 0.0:
-            cpu_percent = cpu_delta / system_delta * 100.0 * os.cpu_count()
+            cpu_percent = cpu_delta / system_delta * 100.0
         fieldprefix = container_fieldname(container)
         print(fieldprefix + '.value', cpu_percent)
         print(fieldprefix + '.extinfo', container_attributes(container))
