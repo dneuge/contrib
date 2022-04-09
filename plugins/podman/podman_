@@ -1109,6 +1109,7 @@ if __name__ == '__main__':
     main()
 
 # FIXME: check if non-running containers need to be excluded from cpu, memory and network (originally solved by #1209)
+# TODO: check if an actual Munin plugin-state file for persisting CPU statistics can be used: http://guide.munin-monitoring.org/en/latest/develop/plugins/advanced-topics.html#storing-the-plugin-s-state
 # TODO: check all possible container states (status)
 # TODO: test if "intermediate" and "dangling" images are shown correctly (first figure out how to produce them, I never had any according to docker_)
 # TODO: add option to use username instead of UIDs on labels
