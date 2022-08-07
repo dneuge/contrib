@@ -82,12 +82,13 @@ C<MODE> can be C<containers>, C<images>, C<status> or C<volumes>. By default, th
 
 =item env.MODE_graph_stackmode
 
-Can be set to C<line> or C<area> to change how the graph C<MODE> renders stacked values.
+Can be set to C<line>, C<area> or C<none> to change how the graph C<MODE> renders stacked values.
 
 C<MODE> can be C<cpu>, C<images>, C<memory>, C<network>, C<status> or C<volumes>. By default, all C<MODE>s will render
 C<area> stacks except C<network> which uses C<line> stacks.
 
 What you select is mainly up to your personal taste: C<area> tends to be more visible but C<line> may be easier to read.
+C<none> disables stacking, allowing each value to be read independently from the graph.
 
 =back
 
@@ -849,6 +850,27 @@ def print_containers_network(client):
         print(fieldprefix + '_down.value', stats['rx_bytes'])
         print(fieldprefix + '_up.extinfo', container_attributes(container))
 
+draw_attributes = {
+    'area': 'AREASTACK',
+    'line': 'LINESTACK1',
+    'none': 'LINE1'
+}
+
+def get_draw_attribute(graph, default):
+    # make sure we got a valid default value
+    if default not in draw_attributes:
+        print('Bad default parameter for graph "%s": "%s" has no draw attribute mapped' % (graph, default), file=sys.stderr)
+        default = list(draw_attributes.keys())[0]
+
+    envname = graph+'_graph_stackmode'
+    request = os.getenv(envname, default)
+
+    # override with default if user requested an invalid mode
+    if request not in draw_attributes:
+        print('Unknown mode requested in "%s", using default %s' % (envname, default), file=sys.stderr)
+        request = default
+
+    return draw_attributes[request]
 
 def volume_full_id(volume):
     return '%d/%s' % (volume.get_uid(), volume.get_name())
@@ -871,7 +893,7 @@ def status(client, mode):
         print("graph_category virtualization")
         print("graph_total All containers")
         
-        stackmode = 'AREASTACK' if os.getenv('status_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        stackmode = get_draw_attribute('status', 'area')
         
         print("running.label RUNNING")
         print("running.draw {}".format(stackmode))
@@ -936,7 +958,7 @@ def images(client, mode):
         print("graph_category virtualization")
         print("graph_total All images")
         
-        stackmode = 'AREASTACK' if os.getenv('images_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        stackmode = get_draw_attribute('images', 'area')
         
         print("intermediate_quantity.label Intermediate images")
         print("intermediate_quantity.draw {}".format(stackmode))
@@ -965,7 +987,7 @@ def volumes(client, mode):
         print("graph_vlabel volumes")
         print("graph_category virtualization")
         
-        stackmode = 'AREASTACK' if os.getenv('volumes_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        stackmode = get_draw_attribute('volumes', 'area')
         
         print("volumes_quantity.label Volumes")
         print("volumes_quantity.draw {}".format(stackmode))
@@ -988,7 +1010,7 @@ def cpu(client, mode):
         print("graph_info This graph shows podman container CPU usage.")
         print("graph_total Total CPU usage")
         
-        stackmode = 'AREASTACK' if os.getenv('cpu_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        stackmode = get_draw_attribute('cpu', 'area')
         
         for container in client.all_containers:
             fieldname = container_fieldname(container)
@@ -1009,7 +1031,7 @@ def network(client, mode):
         print("graph_info This graph shows podman container network usage.")
         print("graph_total Total network usage")
         
-        stackmode = 'AREASTACK' if os.getenv('network_graph_stackmode', 'line') == 'area' else 'LINESTACK1'
+        stackmode = get_draw_attribute('network', 'line')
         
         for container in client.all_containers:
             fieldname = container_fieldname(container)
@@ -1038,7 +1060,7 @@ def memory(client, mode):
         print("graph_info This graph shows podman container memory usage.")
         print("graph_total Total memory usage")
         
-        stackmode = 'AREASTACK' if os.getenv('memory_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        stackmode = get_draw_attribute('memory', 'area')
         
         for container in client.all_containers:
             fieldname = container_fieldname(container)
