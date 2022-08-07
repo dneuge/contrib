@@ -80,6 +80,16 @@ Restricts the graph C<MODE> to always render with a lower boundary of zero if se
 
 C<MODE> can be C<containers>, C<images>, C<status> or C<volumes>. By default, these graphs will not be limited.
 
+=item env.MODE_graph_logarithmic
+
+If set to C<true> a logarithmic scale will be used to plot the C<MODE> graph. This might be useful if the magnitude of
+values such as network traffic is highly variable and occasional bursts or single containers change the scale to a
+maximum value that "hides" the normal baseline activity.
+
+C<MODE> can be C<memory> or C<network>. Enabling logarithmic scale will use log10, 1024 base cannot be applied.
+You probably want to disable value stacking as the result will be very confusing to read.
+By default, all graphs are plotted linear instead of logarithmic.
+
 =item env.MODE_graph_stackmode
 
 Can be set to C<line>, C<area> or C<none> to change how the graph C<MODE> renders stacked values.
@@ -1025,7 +1035,10 @@ def cpu(client, mode):
 def network(client, mode):
     if mode == "config":
         print("graph_title Podman containers network usage")
-        print("graph_args --base 1024 -l 0")
+        if os.getenv("network_graph_logarithmic", "false") == "true":
+            print("graph_args --logarithmic")
+        else:
+            print("graph_args --base 1024 -l 0")
         print("graph_vlabel bits in (-) / out (+) per ${graph_period}")
         print("graph_category virtualization")
         print("graph_info This graph shows podman container network usage.")
@@ -1054,7 +1067,10 @@ def network(client, mode):
 def memory(client, mode):
     if mode == "config":
         print("graph_title Podman containers memory usage")
-        print("graph_args --base 1024 -l 0")
+        if os.getenv("memory_graph_logarithmic", "false") == "true":
+            print("graph_args --logarithmic")
+        else:
+            print("graph_args --base 1024 -l 0")
         print("graph_vlabel Bytes")
         print("graph_category virtualization")
         print("graph_info This graph shows podman container memory usage.")
