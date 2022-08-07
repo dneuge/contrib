@@ -100,6 +100,12 @@ C<area> stacks except C<network> which uses C<line> stacks.
 What you select is mainly up to your personal taste: C<area> tends to be more visible but C<line> may be easier to read.
 C<none> disables stacking, allowing each value to be read independently from the graph.
 
+=item env.MODE_show_total
+
+C<false> disables output of total numbers for the specified C<MODE>.
+
+C<MODE> can be C<cpu>, C<images>, C<memory>, C<network> or C<status>. By default, all listed C<MODE>s will output totals.
+
 =back
 
 
@@ -901,7 +907,9 @@ def status(client, mode):
             print("graph_args --lower-limit 0")
         print("graph_vlabel containers")
         print("graph_category virtualization")
-        print("graph_total All containers")
+
+        if os.getenv('status_show_total', 'true') != 'false':
+            print("graph_total All containers")
         
         draw_attribute = get_draw_attribute('status', 'area')
         
@@ -966,7 +974,9 @@ def images(client, mode):
             print("graph_args --lower-limit 0")
         print("graph_vlabel images")
         print("graph_category virtualization")
-        print("graph_total All images")
+
+        if os.getenv('images_show_total', 'true') != 'false':
+            print("graph_total All images")
         
         draw_attribute = get_draw_attribute('images', 'area')
         
@@ -1018,7 +1028,9 @@ def cpu(client, mode):
         print("graph_vlabel CPU usage (%)")
         print("graph_category virtualization")
         print("graph_info This graph shows podman container CPU usage.")
-        print("graph_total Total CPU usage")
+
+        if os.getenv('cpu_show_total', 'true') != 'false':
+            print("graph_total Total CPU usage")
         
         draw_attribute = get_draw_attribute('cpu', 'area')
         
@@ -1042,7 +1054,9 @@ def network(client, mode):
         print("graph_vlabel bits in (-) / out (+) per ${graph_period}")
         print("graph_category virtualization")
         print("graph_info This graph shows podman container network usage.")
-        print("graph_total Total network usage")
+
+        if os.getenv('network_show_total', 'true') != 'false':
+            print("graph_total Total network usage")
         
         draw_attribute = get_draw_attribute('network', 'line')
         
@@ -1074,7 +1088,9 @@ def memory(client, mode):
         print("graph_vlabel Bytes")
         print("graph_category virtualization")
         print("graph_info This graph shows podman container memory usage.")
-        print("graph_total Total memory usage")
+
+        if os.getenv('memory_show_total', 'true') != 'false':
+            print("graph_total Total memory usage")
         
         draw_attribute = get_draw_attribute('memory', 'area')
         
