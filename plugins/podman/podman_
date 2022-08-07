@@ -936,7 +936,7 @@ def images(client, mode):
         print("graph_category virtualization")
         print("graph_total All images")
         
-        stackmode = 'AREASTACK' if os.getenv('volumes_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        stackmode = 'AREASTACK' if os.getenv('images_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
         
         print("intermediate_quantity.label Intermediate images")
         print("intermediate_quantity.draw {}".format(stackmode))
@@ -1038,7 +1038,7 @@ def memory(client, mode):
         print("graph_info This graph shows podman container memory usage.")
         print("graph_total Total memory usage")
         
-        stackmode = 'AREASTACK' if os.getenv('status_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
+        stackmode = 'AREASTACK' if os.getenv('memory_graph_stackmode', 'area') == 'area' else 'LINESTACK1'
         
         for container in client.all_containers:
             fieldname = container_fieldname(container)
