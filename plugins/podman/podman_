@@ -893,43 +893,43 @@ def status(client, mode):
         print("graph_category virtualization")
         print("graph_total All containers")
         
-        stackmode = get_draw_attribute('status', 'area')
+        draw_attribute = get_draw_attribute('status', 'area')
         
         print("running.label RUNNING")
-        print("running.draw {}".format(stackmode))
+        print("running.draw {}".format(draw_attribute))
         print("running.info Running containers can be manipulated with "
               "`podman container [attach|kill|logs|pause|restart|stop] <NAME>` or "
               "commands run in them with `podman container exec "
               "[--detach|--interactive,--privileged,--tty] <NAME> <COMMAND>`"
               )
         print("unhealthy.label UNHEALTHY")
-        print("unhealthy.draw {}".format(stackmode))
+        print("unhealthy.draw {}".format(draw_attribute))
         print("unhealthy.warning 1")
         print("unhealthy.info Unhealthy containers can be restarted with "
               "`podman container restart <NAME>`")
         print("paused.label PAUSED")
-        print("paused.draw {}".format(stackmode))
+        print("paused.draw {}".format(draw_attribute))
         print("paused.info Paused containers can be resumed with "
               "`podman container unpause <NAME>`")
         print("created.label CREATED")
-        print("created.draw {}".format(stackmode))
+        print("created.draw {}".format(draw_attribute))
         print("created.info New containers can be created with "
               "`podman container create --name <NAME> <IMAGE_ID >` or "
               "`podman container run --name <NAME> <IMAGE_ID> <COMMAND>`")
         print("restarting.label RESTARTING")
-        print("restarting.draw {}".format(stackmode))
+        print("restarting.draw {}".format(draw_attribute))
         print("restarting.info Containers can be restarted with "
               "`podman container restart <NAME>`")
         print("removing.label REMOVING")
-        print("removing.draw {}".format(stackmode))
+        print("removing.draw {}".format(draw_attribute))
         print("removing.info Containers can be removed with "
               "`podman container rm <NAME>`")
         print("exited.label EXITED")
-        print("exited.draw {}".format(stackmode))
+        print("exited.draw {}".format(draw_attribute))
         print("exited.info Exited containers can be started with "
               "`podman container start [--attach] <NAME>`")
         print("dead.label DEAD")
-        print("dead.draw {}".format(stackmode))
+        print("dead.draw {}".format(draw_attribute))
         print("dead.warning 1")
         print("dead.info Dead containers can be started with "
               "`podman container start <NAME>`")
@@ -958,19 +958,19 @@ def images(client, mode):
         print("graph_category virtualization")
         print("graph_total All images")
         
-        stackmode = get_draw_attribute('images', 'area')
+        draw_attribute = get_draw_attribute('images', 'area')
         
         print("intermediate_quantity.label Intermediate images")
-        print("intermediate_quantity.draw {}".format(stackmode))
+        print("intermediate_quantity.draw {}".format(draw_attribute))
         print("intermediate_quantity.info All unused images can be deleted with "
               "`podman image prune --all`")
         print("images_quantity.label Images")
-        print("images_quantity.draw {}".format(stackmode))
+        print("images_quantity.draw {}".format(draw_attribute))
         print("images_quantity.info Images can be used in containers with "
               "`podman container create --name <NAME> <IMAGE_ID >` or "
               "`podman container run --name <NAME> <IMAGE_ID> <COMMAND>`")
         print("dangling_quantity.label Dangling images")
-        print("dangling_quantity.draw {}".format(stackmode))
+        print("dangling_quantity.draw {}".format(draw_attribute))
         print("dangling_quantity.info Dangling images can be deleted with "
               "`podman image prune`"
               "or tagged with `podman image tag <IMAGE_ID> <NAME>`")
@@ -987,10 +987,10 @@ def volumes(client, mode):
         print("graph_vlabel volumes")
         print("graph_category virtualization")
         
-        stackmode = get_draw_attribute('volumes', 'area')
+        draw_attribute = get_draw_attribute('volumes', 'area')
         
         print("volumes_quantity.label Volumes")
-        print("volumes_quantity.draw {}".format(stackmode))
+        print("volumes_quantity.draw {}".format(draw_attribute))
         print("volumes_quantity.info Unused volumes can be deleted with "
               "`podman volume prune`")
     else:
@@ -1010,12 +1010,12 @@ def cpu(client, mode):
         print("graph_info This graph shows podman container CPU usage.")
         print("graph_total Total CPU usage")
         
-        stackmode = get_draw_attribute('cpu', 'area')
+        draw_attribute = get_draw_attribute('cpu', 'area')
         
         for container in client.all_containers:
             fieldname = container_fieldname(container)
             print("{}.label {}".format(fieldname, full_container_name(container)))
-            print("{}.draw {}".format(fieldname, stackmode))
+            print("{}.draw {}".format(fieldname, draw_attribute))
             print("{}.info {}".format(fieldname, container_attributes(container)))
             print("{}.min 0".format(fieldname))
     else:
@@ -1031,7 +1031,7 @@ def network(client, mode):
         print("graph_info This graph shows podman container network usage.")
         print("graph_total Total network usage")
         
-        stackmode = get_draw_attribute('network', 'line')
+        draw_attribute = get_draw_attribute('network', 'line')
         
         for container in client.all_containers:
             fieldname = container_fieldname(container)
@@ -1041,7 +1041,7 @@ def network(client, mode):
             print("{}_down.graph no".format(fieldname))
             print("{}_down.cdef {}_down,8,*".format(fieldname, fieldname))
             print("{}_up.label {}".format(fieldname, full_container_name(container)))
-            print("{}_up.draw {}".format(fieldname, stackmode))
+            print("{}_up.draw {}".format(fieldname, draw_attribute))
             print("{}_up.type DERIVE".format(fieldname))
             print("{}_up.min 0".format(fieldname))
             print("{}_up.negative {}_down".format(fieldname, fieldname))
@@ -1060,12 +1060,12 @@ def memory(client, mode):
         print("graph_info This graph shows podman container memory usage.")
         print("graph_total Total memory usage")
         
-        stackmode = get_draw_attribute('memory', 'area')
+        draw_attribute = get_draw_attribute('memory', 'area')
         
         for container in client.all_containers:
             fieldname = container_fieldname(container)
             print("{}.label {}".format(fieldname, full_container_name(container)))
-            print("{}.draw {}".format(fieldname, stackmode))
+            print("{}.draw {}".format(fieldname, draw_attribute))
             print("{}.info {}".format(fieldname, container_attributes(container)))
     else:
         print_containers_memory(client)
