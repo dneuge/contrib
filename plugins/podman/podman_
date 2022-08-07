@@ -519,6 +519,10 @@ class PodmanAPI:
 
     def stats(self):
         json = get_json(self.socket, '/libpod/containers/stats?stream=false')
+
+        if json is None or 'Stats' not in json or json['Stats'] is None:
+            return {}
+
         return {c['ContainerID']: ContainerStatistics(c, self.is_root) for c in json['Stats']}
 
     def volumes(self):
